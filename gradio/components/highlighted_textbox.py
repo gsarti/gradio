@@ -7,7 +7,7 @@ from typing import Callable, Literal
 
 import numpy as np
 from gradio_client.documentation import document, set_documentation_group
-from gradio_client.serializing import StringSerializable
+from gradio_client.serializing import JSONSerializable
 
 from gradio.components.base import (
     FormComponent,
@@ -37,26 +37,34 @@ class HighlightedTextbox(
     Submittable,
     Focusable,
     IOComponent,
-    StringSerializable,
+    JSONSerializable,
     TokenInterpretable,
 ):
     """
     Creates a textarea for user to enter string input or display string output where some
     elements are highlighted.
-    Preprocessing: passes textarea value as a {str} into the function.
-    Postprocessing: expects a {str} returned from function and sets textarea value to it.
-    Examples-format: a {str} representing the textbox input.
+    Preprocessing: passes a list of tuples as a {List[Tuple[str, float | str | None]]]} into the function. If no labels are provided, the text will be displayed as a single span.
+    Postprocessing: expects a {List[Tuple[str, float | str]]]} consisting of spans of text and their associated labels, or a {Dict} with two keys: 
+        (1) "text" whose value is the complete text, and 
+        (2) "highlights", which is a list of dictionaries, each of which have the keys: 
+            "highlight_type" (consisting of the highlight label), 
+            "start" (the character index where the label starts), and 
+            "end" (the character index where the label ends). 
+        Highlights should not overlap.
 
     Demos: TBD
     """
 
     def __init__(
         self,
-        value: str | Callable | None = "",
+        value: list[tuple[str, str | None]] | dict | Callable | None = None,
         *,
-        lines: int = 1,
-        max_lines: int = 20,
-        placeholder: str | None = None,
+        color_map: dict[str, str] | None = None,
+        show_legend: bool = False,
+        show_legend_label: bool = False,
+        legend_label: str = "",
+        combine_adjacent: bool = False,
+        adjacent_separator: str = "",
         label: str | None = None,
         info: str | None = None,
         every: float | None = None,
@@ -75,10 +83,11 @@ class HighlightedTextbox(
     ):
         """
         Parameters:
-            value: default text to provide in textarea. If callable, the function will be called whenever the app loads to set the initial value of the component.
-            lines: minimum number of line rows to provide in textarea.
-            max_lines: maximum number of line rows to provide in textarea.
-            placeholder: placeholder hint to provide behind textarea.
+            value: Default value to show. If callable, the function will be called whenever the app loads to set the initial value of the component.
+            color_map: A dictionary mapping labels to colors. The colors may be specified as hex codes or by their names. For example: {"person": "red", "location": "#FFEE22"}
+            show_legend: whether to show span categories in a separate legend or inline.
+            combine_adjacent: If True, will merge the labels of adjacent tokens belonging to the same category.
+            adjacent_separator: Specifies the separator to be used between tokens if combine_adjacent is True.
             label: component name in interface.
             info: additional component description.
             every: If `value` is a callable, run the function 'every' number of seconds while the client connection is open. Has no effect otherwise. Queue must be enabled. The event can be accessed (e.g. to cancel it) via this component's .load_event attribute.
@@ -94,10 +103,13 @@ class HighlightedTextbox(
             elem_classes: An optional list of strings that are assigned as the classes of this component in the HTML DOM. Can be used for targeting CSS styles.
             show_copy_button: If True, includes a copy button to copy the text in the textbox. Only applies if show_label is True.
         """
-        self.lines = lines
-        self.max_lines = max(lines, max_lines)
-        self.placeholder = placeholder
+        self.color_map = color_map
+        self.show_legend = show_legend
+        self.combine_adjacent = combine_adjacent
+        self.adjacent_separator = adjacent_separator
         self.show_copy_button = show_copy_button
+        self.show_legend_label = show_legend_label
+        self.legend_label = legend_label
         self.autofocus = autofocus
         self.select: EventListenerMethod
         self.autoscroll = autoscroll
@@ -126,10 +138,14 @@ class HighlightedTextbox(
 
     @staticmethod
     def update(
-        value: str | Literal[_Keywords.NO_VALUE] | None = _Keywords.NO_VALUE,
-        lines: int | None = None,
-        max_lines: int | None = None,
-        placeholder: str | None = None,
+        value: list[tuple[str, str | None]]
+        | dict
+        | Literal[_Keywords.NO_VALUE]
+        | None = _Keywords.NO_VALUE,
+        color_map: dict[str, str] | None = None,
+        show_legend: bool | None = None,
+        show_legend_label: bool | None = None,
+        legend_label: str | None = None,
         label: str | None = None,
         info: str | None = None,
         show_label: bool | None = None,
@@ -146,9 +162,10 @@ class HighlightedTextbox(
             "Using the update method is deprecated. Simply return a new object instead, e.g. `return gr.HighlightedTextbox(...)` instead of `return gr.HighlightedTextbox.update(...)`."
         )
         return {
-            "lines": lines,
-            "max_lines": max_lines,
-            "placeholder": placeholder,
+            "color_map": color_map,
+            "show_legend": show_legend,
+            "show_legend_label": show_legend_label,
+            "legend_label": legend_label,
             "label": label,
             "info": info,
             "show_label": show_label,
@@ -174,15 +191,64 @@ class HighlightedTextbox(
         """
         return None if x is None else str(x)
 
-    def postprocess(self, y: str | None) -> str | None:
+    def postprocess(
+        self, y: list[tuple[str, str | float | None]] | dict | None
+    ) -> list[tuple[str, str | float | None]] | None:
         """
-        Postproccess the function output y by converting it to a str before passing it to the frontend.
         Parameters:
-            y: function output to postprocess.
+            y: List of (word, category) tuples, or a dictionary of two keys: "text", and "highlights", which itself is 
+            a list of dictionaries, each of which have the keys: "highlight_type", "start", and "end"
         Returns:
-            text
+            List of (word, category) tuples
         """
-        return None if y is None else str(y)
+        if y is None:
+            return None
+        if isinstance(y, dict):
+            try:
+                text = y["text"]
+                highlights = y["highlights"]
+            except KeyError as ke:
+                raise ValueError(
+                    "Expected a dictionary with keys 'text' and 'highlights' "
+                    "for the value of the HighlightedText component."
+                ) from ke
+            if len(highlights) == 0:
+                y = [(text, None)]
+            else:
+                list_format = []
+                index = 0
+                entities = sorted(highlights, key=lambda x: x["start"])
+                for entity in entities:
+                    list_format.append((text[index : entity["start"]], None))
+                    highlight_type = entity.get("highlight_type")
+                    list_format.append(
+                        (text[entity["start"] : entity["end"]], highlight_type)
+                    )
+                    index = entity["end"]
+                list_format.append((text[index:], None))
+                y = list_format
+        if self.combine_adjacent:
+            output = []
+            running_text, running_category = None, None
+            for text, category in y:
+                if running_text is None:
+                    running_text = text
+                    running_category = category
+                elif category == running_category:
+                    running_text += self.adjacent_separator + text
+                elif not text:
+                    # Skip fully empty item, these get added in processing
+                    # of dictionaries.
+                    pass
+                else:
+                    output.append((running_text, running_category))
+                    running_text = text
+                    running_category = category
+            if running_text is not None:
+                output.append((running_text, running_category))
+            return output
+        else:
+            return y
 
     def set_interpret_parameters(
         self, separator: str = " ", replacement: str | None = None
@@ -243,6 +309,7 @@ class HighlightedTextbox(
         self,
         *,
         show_copy_button: bool | None = None,
+        color_map: dict[str, str] | None = None,
         container: bool | None = None,
         **kwargs,
     ):
@@ -254,4 +321,6 @@ class HighlightedTextbox(
             self.show_copy_button = show_copy_button
         if container is not None:
             self.container = container
+        if color_map is not None:
+            self.color_map = color_map
         return self

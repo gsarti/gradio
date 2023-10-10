@@ -9,6 +9,7 @@
 	"private": true,
 	"main_changeset": true,
 	"exports": {
+		".": "./static/index.ts",
 		"./package.json": "./package.json",
 		"./interactive": "./interactive/index.ts",
 		"./static": "./static/index.ts",
@@ -18,6 +19,7 @@
 		"@gradio/atoms": "workspace:^",
 		"@gradio/icons": "workspace:^",
 		"@gradio/statustracker": "workspace:^",
-		"@gradio/utils": "workspace:^"
+		"@gradio/utils": "workspace:^",
+		"@gradio/theme": "workspace:^"
 	}
 }

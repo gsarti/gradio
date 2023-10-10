@@ -4,10 +4,12 @@
 	import type { Gradio, SelectData } from "@gradio/utils";
 	import { createEventDispatcher } from "svelte";
 
-	import TextBox from "../shared";
+	import HighlightedTextbox from "../shared";
 	import { Block } from "@gradio/atoms";
 	import { StatusTracker } from "@gradio/statustracker";
 	import type { LoadingStatus } from "@gradio/statustracker";
+	import { merge_elements } from "../utils";
+
 	const dispatch = createEventDispatcher<{
 		change: string;
 		submit: never;
@@ -29,27 +31,33 @@
 		| { dispatch: typeof dispatch } = {
 		dispatch
 	};
-	export let label = "Textbox";
+	export let label = "Highlighted Textbox";
+	export let legend_label = "Highlights:"
 	export let info: string | undefined = undefined;
 	export let elem_id = "";
 	export let elem_classes: string[] = [];
 	export let visible = true;
-	export let value = "";
-	export let lines: number;
-	export let placeholder = "";
+	export let value: [string, string | null][];
 	export let show_label: boolean;
-	export let max_lines: number;
-	export let type: "text" | "password" | "email" = "text";
+	export let show_legend: boolean;
+	export let show_legend_label: boolean;
+	export let color_map: Record<string, string> = {};
 	export let container = true;
 	export let scale: number | null = null;
 	export let min_width: number | undefined = undefined;
 	export let show_copy_button = false;
 	export let loading_status: LoadingStatus | undefined = undefined;
 	export let value_is_output = false;
-	export let rtl = false;
-	export let text_align: "left" | "right" | undefined = undefined;
 	export let autofocus = false;
-	export let autoscroll = true;
+	export let combine_adjacent = false;
+
+	$: if (!color_map && Object.keys(color_map).length) {
+		color_map = color_map;
+	}
+
+	$: if (value && combine_adjacent) {
+		value = merge_elements(value, "equal");
+	}
 </script>
 
 <Block
@@ -65,23 +73,20 @@
 		<StatusTracker {...loading_status} />
 	{/if}
 
-	<TextBox
+	<HighlightedTextbox
 		bind:value
 		bind:value_is_output
 		{label}
 		{info}
 		{show_label}
-		{lines}
-		{type}
-		{rtl}
-		{text_align}
-		max_lines={!max_lines ? lines + 1 : max_lines}
-		{placeholder}
+		{show_legend}
+		{show_legend_label}
+		{legend_label}
+		{color_map}
 		{show_copy_button}
 		{autofocus}
 		{container}
-		{autoscroll}
-		on:change={() => gradio.dispatch("change", value)}
+		on:change={() => gradio.dispatch("change")}
 		on:input={() => gradio.dispatch("input")}
 		on:submit={() => gradio.dispatch("submit")}
 		on:blur={() => gradio.dispatch("blur")}
