@@ -583,6 +583,7 @@ COMPONENT_MAPPING: dict[str, type] = {
     "colorpicker": StringSerializable,
     "label": JSONSerializable,
     "highlightedtext": JSONSerializable,
+    "highlightedtextbox": JSONSerializable,
     "json": JSONSerializable,
     "html": StringSerializable,
     "gallery": GallerySerializable,

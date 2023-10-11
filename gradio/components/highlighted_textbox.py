@@ -192,8 +192,8 @@ class HighlightedTextbox(
         return None if x is None else str(x)
 
     def postprocess(
-        self, y: list[tuple[str, str | float | None]] | dict | None
-    ) -> list[tuple[str, str | float | None]] | None:
+        self, y: list[tuple[str, str | None]] | dict | None
+    ) -> list[tuple[str, str | None]] | None:
         """
         Parameters:
             y: List of (word, category) tuples, or a dictionary of two keys: "text", and "highlights", which itself is 
@@ -227,6 +227,7 @@ class HighlightedTextbox(
                     index = entity["end"]
                 list_format.append((text[index:], None))
                 y = list_format
+        print(y)
         if self.combine_adjacent:
             output = []
             running_text, running_category = None, None

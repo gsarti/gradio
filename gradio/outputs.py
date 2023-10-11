@@ -316,8 +316,9 @@ class Image3D(components.Model3D):
 class HighlightedTextbox(components.HighlightedTextbox):
     def __init__(
         self,
-        type: str = "text",
+        color_map: dict[str, str] = None,
         label: Optional[str] = None,
+        show_legend: bool = False,
     ):
         warn_outputs_deprecation()
-        super().__init__(label=label, type=type)
+        super().__init__(color_map=color_map, label=label, show_legend=show_legend)

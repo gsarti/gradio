@@ -52,17 +52,21 @@
 		correct_color_map(color_map, _color_map, browser, ctx);
 	}
 
-	$: if (value.length > 0 && !is_value_set) {
-		el_text = value.map(([text, _]) => text).join(" ");
-		marked_el_text = value.map(([text, category]) => {
-			if (category !== null) {
-				return `<mark class="hl ${category}" style="background-color:${_color_map[category].secondary}">${text}</mark>`;
-			} else {
-				return text;
-			}
-		}).join(" ") + " ";
-		is_value_set = true;
+	function set_text_from_value(): void {
+		if (value.length > 0 && !is_value_set) {
+			el_text = value.map(([text, _]) => text).join(" ");
+			marked_el_text = value.map(([text, category]) => {
+				if (category !== null) {
+					return `<mark class="hl ${category}" style="background-color:${_color_map[category].secondary}">${text}</mark>`;
+				} else {
+					return text;
+				}
+			}).join(" ") + " ";
+			is_value_set = true;
+		}
 	}
+
+	$: set_text_from_value();
 
 	const dispatch = createEventDispatcher<{
 		change: string;
@@ -81,6 +85,8 @@
 	}
 	afterUpdate(() => {
 		value_is_output = false;
+		is_value_set = false;
+		set_text_from_value();
 	});
 	$: el_text, handle_change();
 
