@@ -227,7 +227,6 @@ class HighlightedTextbox(
                     index = entity["end"]
                 list_format.append((text[index:], None))
                 y = list_format
-        print(y)
         if self.combine_adjacent:
             output = []
             running_text, running_category = None, None
