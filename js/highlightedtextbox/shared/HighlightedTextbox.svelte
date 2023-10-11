@@ -53,7 +53,7 @@
 	}
 
 	function set_text_from_value(): void {
-		if (value.length > 0 && !is_value_set) {
+		if (value.length > 0 && value_is_output) {
 			el_text = value.map(([text, _]) => text).join(" ");
 			marked_el_text = value.map(([text, category]) => {
 				if (category !== null) {
@@ -78,17 +78,16 @@
 	}>();
 
 	function handle_change(): void {
-		dispatch("change", el_text);
+		dispatch("change", marked_el_text);
 		if (!value_is_output) {
 			dispatch("input");
 		}
 	}
 	afterUpdate(() => {
-		value_is_output = false;
-		is_value_set = false;
 		set_text_from_value();
+		value_is_output = false;
 	});
-	$: el_text, handle_change();
+	$: marked_el_text, handle_change();
 
 	// Given a string like Hello <mark class="hl red" style="background-color:#fee2e2">world!</mark>  This is cool.
 	// for marked_el_text and its previous parsed version (value) like [["Hello ", null], ["world!", "red"], [" This is ", null], ["nice", "blue"]],
