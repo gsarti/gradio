@@ -20,10 +20,10 @@ export function name_to_rgba(
 
 export function correct_color_map(
 	color_map: Record<string, string>,
-	_color_map: Record<string, { primary: string; secondary: string }>,
 	browser: any,
 	ctx: CanvasRenderingContext2D | null
-): void {
+): Record<string, { primary: string; secondary: string }> {
+	var _color_map: Record<string, { primary: string; secondary: string }> = {};
 	for (const col in color_map) {
 		const _c = color_map[col].trim();
 
@@ -40,6 +40,7 @@ export function correct_color_map(
 			};
 		}
 	}
+	return _color_map;
 }
 
 export function merge_elements(

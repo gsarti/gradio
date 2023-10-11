@@ -27,29 +27,30 @@
 	export let autofocus = false;
 	
 	let el: HTMLDivElement;
-	let is_value_set: boolean = false;
 	let el_text: string = "";
 	let marked_el_text: string = "";
 	let ctx: CanvasRenderingContext2D;
+	let current_color_map: Record<string, string> = {};
 	let _color_map: Record<string, { primary: string; secondary: string }> = {};
 	let copied = false;
 	let timer: NodeJS.Timeout;
 
-	$: {
-		if (!color_map) {
-			color_map = {};
+	function set_color_map(): void {
+		if (!color_map || Object.keys(color_map).length === 0) {
+			current_color_map = {};
+		}
+		else {
+			current_color_map = color_map;
 		}
 		if (value.length > 0) {
 			for (let [_, label] of value) {
-				if (label !== null) {
-					if (!(label in color_map)) {
-						let color = get_next_color(Object.keys(color_map).length);
-						color_map[label] = color;
-					}
+				if (label !== null && !(label in current_color_map)) {
+					let color = get_next_color(Object.keys(current_color_map).length);
+					current_color_map[label] = color;
 				}
 			}
 		}
-		correct_color_map(color_map, _color_map, browser, ctx);
+		_color_map = correct_color_map(current_color_map, browser, ctx);
 	}
 
 	function set_text_from_value(): void {
@@ -62,11 +63,11 @@
 					return text;
 				}
 			}).join(" ") + " ";
-			is_value_set = true;
 		}
 	}
 
 	$: set_text_from_value();
+	$: set_color_map();
 
 	const dispatch = createEventDispatcher<{
 		change: string;
@@ -84,6 +85,7 @@
 		}
 	}
 	afterUpdate(() => {
+		set_color_map();
 		set_text_from_value();
 		value_is_output = false;
 	});
