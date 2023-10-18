@@ -26,7 +26,7 @@ let call_asgi_app_from_js: (
 	receive: () => Promise<unknown>,
 	send: (event: any) => Promise<void>
 ) => Promise<void>;
-let run_script: (path: string) => void;
+let run_script: (path: string) => Promise<void>;
 let unload_local_modules: (target_dir_path?: string) => void;
 
 async function loadPyodideAndPackages(
@@ -218,7 +218,7 @@ self.onmessage = async (event: MessageEvent<InMessage>): Promise<void> => {
 			case "run-python-file": {
 				unload_local_modules();
 
-				run_script(msg.data.path);
+				await run_script(msg.data.path);
 
 				const replyMessage: ReplyMessageSuccess = {
 					type: "reply:success",
@@ -311,12 +311,30 @@ self.onmessage = async (event: MessageEvent<InMessage>): Promise<void> => {
 						};
 						messagePort.postMessage(replyMessage);
 					});
+				break;
 			}
 		}
 	} catch (error) {
+		console.error(error);
+
+		if (!(error instanceof Error)) {
+			throw error;
+		}
+
+		// The `error` object may contain non-serializable properties such as function (for example Pyodide.FS.ErrnoError which has a `.setErrno` function),
+		// so it must be converted to a plain object before sending it to the main thread.
+		// Otherwise, the following error will be thrown:
+		// `Uncaught (in promise) DOMException: Failed to execute 'postMessage' on 'MessagePort': #<Object> could not be cloned.`
+		// Also, the JSON.stringify() and JSON.parse() approach like https://stackoverflow.com/a/42376465/13103190
+		// does not work for Error objects because the Error object is not enumerable.
+		// So we use the following approach to clone the Error object.
+		const cloneableError = new Error(error.message);
+		cloneableError.name = error.name;
+		cloneableError.stack = error.stack;
+
 		const replyMessage: ReplyMessageError = {
 			type: "reply:error",
-			error: error as Error
+			error: cloneableError
 		};
 		messagePort.postMessage(replyMessage);
 	}
